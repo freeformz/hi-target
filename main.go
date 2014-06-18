@@ -9,6 +9,17 @@ import (
 
 func serveHijack(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("serveHijack")
+
+	if r.Header.Get("Upgrade") == "" {
+		http.Error(w, "Upgrade not provided so not hijacking", http.StatusBadRequest)
+		return
+	}
+
+	if r.Header.Get("Connection") != "Upgrade" {
+		http.Error(w, "Connection header must be 'Upgrade' in order to upgrade the connection", http.StatusBadRequest)
+		return
+	}
+
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
