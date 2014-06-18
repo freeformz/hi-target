@@ -1,17 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 )
 
 func serveHijack(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("serveHijack")
-
-	if r.Header.Get("Upgrade") == "" {
-		http.Error(w, "Upgrade not provided so not hijacking", http.StatusBadRequest)
+	upgradeHeader := r.Header.Get("Upgrade")
+	if upgradeHeader == "" {
+		http.Error(w, "Upgrade header not provided so not hijacking", http.StatusBadRequest)
 		return
 	}
 
@@ -31,21 +29,24 @@ func serveHijack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Don't forget to close the connection:
+	log.Println("Trying to upgrade hijacked connection to " + upgradeHeader + " !")
+
 	defer conn.Close()
 
-	log.Println("Upgrade: " + r.Header.Get("Upgrade"))
-	log.Println("Connection: " + r.Header.Get("Connection"))
+	// Send the right response...
 	bufrw.WriteString("HTTP/1.1 101 Switching Protocols\r\n")
 	bufrw.WriteString("Upgrade: " + r.Header.Get("Upgrade") + "\r\n")
 	bufrw.WriteString("Connection: " + r.Header.Get("Connection") + "\r\n")
 	bufrw.WriteString("\r\n")
 	bufrw.Flush()
+
+	// After this we're just a TCP connection
 	bufrw.WriteString("Now we're speaking raw TCP!\r\n")
 	bufrw.Flush()
 }
 
 func main() {
+	log.SetFlags(0)
 	http.HandleFunc("/hijack", serveHijack)
 	log.Fatal(http.ListenAndServe(":"+os.Getenv("PORT"), nil))
 }
