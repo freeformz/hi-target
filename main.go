@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/binary"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -39,10 +41,25 @@ func serveHijack(w http.ResponseWriter, r *http.Request) {
 	bufrw.WriteString("Connection: " + r.Header.Get("Connection") + "\r\n")
 	bufrw.WriteString("\r\n")
 	bufrw.Flush()
-
 	// After this we're just a TCP connection
-	bufrw.WriteString("Now we're speaking raw TCP!\r\n")
-	bufrw.Flush()
+
+	data := []byte("Hello")
+	binary.Write(conn, binary.LittleEndian, uint32(len(data)))
+	conn.Write(data)
+
+	var messageSizeU uint32
+	err = binary.Read(conn, binary.LittleEndian, &messageSizeU)
+	if err != nil {
+		log.Fatalf("Error while reading messsage size %d: \n", messageSizeU, err)
+	}
+
+	buff := make([]byte, messageSizeU)
+	_, err = io.ReadFull(conn, buff)
+	if err != nil {
+		log.Fatal("Error while reading message: ", err)
+	}
+
+	log.Println("Msg from client: " + string(buff))
 }
 
 func main() {

@@ -2,7 +2,8 @@ package main
 
 import (
 	"crypto/tls"
-	"io/ioutil"
+	"encoding/binary"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -49,24 +50,27 @@ func main() {
 		} else {
 			log.Println("Upgraded Connection!")
 			hc, rdr := cc.Hijack()
+			log.Println("Hijacked Connection!")
 
-			data, err := ioutil.ReadAll(rdr)
+			var messageSizeU uint32
+			err := binary.Read(rdr, binary.LittleEndian, &messageSizeU)
 			if err != nil {
-				log.Println("ReadAll 1 ", err)
-				panic(err)
+				log.Fatal("Unable to read message size: ", err)
 			}
 
-			log.Println("drain rdr")
-			log.Println(string(data))
+			log.Println("Read Message Length: ", messageSizeU)
 
-			data, err = ioutil.ReadAll(hc)
+			buff := make([]byte, messageSizeU)
+			_, err = io.ReadFull(rdr, buff)
 			if err != nil {
-				log.Println("ReadAll 2 ", err)
-				panic(err)
+				log.Fatal("Unable to read message: ", err)
 			}
 
-			log.Println("drain the hijacked connection")
-			log.Println(string(data))
+			log.Println("Message from Server: " + string(buff))
+
+			msg := []byte("Ohai There!. Do you like length prefixed communication?")
+			binary.Write(hc, binary.LittleEndian, uint32(len(msg)))
+			hc.Write(msg)
 
 			hc.Close()
 
